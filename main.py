@@ -1,28 +1,13 @@
-import os
-from dotenv import load_dotenv
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from config import TG_BOT_TOKEN
 from handlers import basic, random
 
-load_dotenv()
-
-TG_BOT_TOKEN = os.getenv('BOT_TOKEN')
-CHATGPT_TOKEN = os.getenv('OPENAI_API_KEY')
-
-if not all([TG_BOT_TOKEN, CHATGPT_TOKEN]):
-    raise ValueError("Didn't find tokens in .env")
-
-os.makedirs("logs", exist_ok=True)
-
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.DEBUG,
-    handlers=[
-        logging.FileHandler("logs/bot.log", encoding="utf-8"),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
 
 def main():
     try:
@@ -40,5 +25,8 @@ def main():
     except Exception as e:
         logger.error('Ошибка при запуске', e)
 
+
 if __name__ == "__main__":
     main()
+
+[InlineKeyboardButton("👨‍🍳 Подготовка меню (скоро)", callback_data="cook_coming_soon")]
