@@ -1,10 +1,17 @@
+import os
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from config import TG_BOT_TOKEN
 from handlers import basic, random
 
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("logs/bot.log", encoding="utf-8"),
+        logging.StreamHandler()  # также выводим в консоль
+    ]
 )
 logger = logging.getLogger(__name__)
 
