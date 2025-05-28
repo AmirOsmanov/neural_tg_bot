@@ -40,7 +40,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == "random_fact":
-        # Этот случай обрабатывается в random_fact.py
+        # Этот случай обрабатывается в random.py
         pass
     elif query.data in ["gpt_coming_soon", "talk_coming_soon", "quiz_coming_soon", "cook_coming_soon"]:
         await query.edit_message_text(
@@ -50,7 +50,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
         await start_menu_again(query)
 
 

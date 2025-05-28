@@ -28,5 +28,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-[InlineKeyboardButton("👨‍🍳 Подготовка меню (скоро)", callback_data="cook_coming_soon")]
