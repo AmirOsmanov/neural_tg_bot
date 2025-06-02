@@ -1,7 +1,7 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from handlers.basic import get_main_menu_keyboard
+from services.ui import get_main_menu_keyboard
 from services.openai_client import get_random_fact
 
 logger = logging.getLogger(__name__)
