@@ -7,6 +7,16 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+def get_main_menu_keyboard():
+    """Возвращает клавиатуру главного меню"""
+    keyboard = [
+        [InlineKeyboardButton("🎲 Рандомный факт", callback_data="random_fact")],
+        [InlineKeyboardButton("🤖 ChatGPT", callback_data="gpt_run")],
+        [InlineKeyboardButton("👥 Диалог с личностью (скоро)", callback_data="talk_coming_soon")],
+        [InlineKeyboardButton("🧠 Квиз (скоро)", callback_data="quiz_coming_soon")],
+        [InlineKeyboardButton("👨‍🍳 Подготовка меню (скоро)", callback_data="cook_coming_soon")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка команды /start."""
@@ -34,7 +44,13 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "random_fact":
         # Этот случай обрабатывается в random.py
         pass
-    elif query.data in ["gpt_coming_soon", "talk_coming_soon", "quiz_coming_soon", "cook_coming_soon"]:
+    elif query.data == "gpt_run":
+        await query.message.delete()
+        await context.bot.send_message(
+            chat_id=query.from_user.id,
+            text="✍️ Введите команду /gpt для начала общения с ChatGPT"
+        )
+    elif query.data in ["talk_coming_soon", "quiz_coming_soon", "cook_coming_soon"]:
         await query.edit_message_text(
             "🚧 <b>Функция в разработке!</b>\n\n"
             "Эта функция будет добавлена на следующих уроках.\n"
@@ -56,14 +72,3 @@ async def start_menu_again(query):
         parse_mode='HTML',
         reply_markup=reply_markup
     )
-
-def get_main_menu_keyboard():
-    """Возвращает клавиатуру главного меню"""
-    keyboard = [
-        [InlineKeyboardButton("🎲 Рандомный факт", callback_data="random_fact")],
-        [InlineKeyboardButton("🤖 ChatGPT (скоро)", callback_data="gpt_coming_soon")],
-        [InlineKeyboardButton("👥 Диалог с личностью (скоро)", callback_data="talk_coming_soon")],
-        [InlineKeyboardButton("🧠 Квиз (скоро)", callback_data="quiz_coming_soon")],
-        [InlineKeyboardButton("👨‍🍳 Подготовка меню (скоро)", callback_data="cook_coming_soon")],
-    ]
-    return InlineKeyboardMarkup(keyboard)
