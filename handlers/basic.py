@@ -41,10 +41,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    if query.data == "random_fact":
-        # Этот случай обрабатывается в random.py
-        pass
-    elif query.data == "gpt_run":
+    if query.data == "gpt_run":
         await query.message.delete()
         await context.bot.send_message(
             chat_id=query.from_user.id,

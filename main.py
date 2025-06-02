@@ -1,4 +1,5 @@
 import logging
+import os
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -13,10 +14,18 @@ from handlers.gpt import start_gpt, handle_gpt_message, cancel, return_to_menu
 from config import TG_BOT_TOKEN
 
 # Настройка логирования
+os.makedirs("logs", exist_ok=True)
+
+# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("logs/bot.log", encoding="utf-8"),
+        logging.StreamHandler()  # Для вывода в консоль
+    ]
 )
+
 logger = logging.getLogger(__name__)
 
 # Состояния для ChatGPT
@@ -32,8 +41,9 @@ def main():
     application.add_handler(CommandHandler("random", random_fact))
 
     # Обработка кнопок (в том числе gpt_run и random_finish)
-    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(random_fact|gpt_run)$"))
-    application.add_handler(CallbackQueryHandler(random_fact_callback, pattern="^(random_more|random_finish)$"))
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^gpt_run$"))
+    application.add_handler(
+        CallbackQueryHandler(random_fact_callback, pattern="^(random_fact|random_more|random_finish)$"))
 
     # ChatGPT ConversationHandler
     gpt_handler = ConversationHandler(
