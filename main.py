@@ -1,4 +1,3 @@
-import os
 import logging
 from telegram.ext import (
     Application,
@@ -6,57 +5,55 @@ from telegram.ext import (
     CallbackQueryHandler,
     ConversationHandler,
     MessageHandler,
-    filters,
+    filters
 )
+from handlers.basic import start, menu_callback
+from handlers.random import random_fact, random_fact_callback
+from handlers.gpt import start_gpt, handle_gpt_message, cancel, return_to_menu
 from config import TG_BOT_TOKEN
-from handlers import basic, random, gpt
 
-os.makedirs("logs", exist_ok=True)
+# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler("logs/bot.log", encoding="utf-8"),
-        logging.StreamHandler()  # также выводим в консоль
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
+# Состояния для ChatGPT
+from handlers.gpt import GPT_MODE
 
 def main():
-    try:
-        application = Application.builder().token(TG_BOT_TOKEN).build()
+    application = Application.builder().token(TG_BOT_TOKEN).build()
 
-        # Стартовое меню
-        application.add_handler(CommandHandler("start", basic.start))
-        application.add_handler(CallbackQueryHandler(basic.menu_callback))
+    # Обработка команды /start
+    application.add_handler(CommandHandler("start", start))
 
-        # Рандомный факт
-        application.add_handler(CommandHandler("random", random.random_fact))
-        application.add_handler(CallbackQueryHandler(random.random_fact_callback, pattern="^random_"))
+    # Обработка команды /random
+    application.add_handler(CommandHandler("random", random_fact))
 
-        # ChatGPT
-        conv_gpt = ConversationHandler(
-            entry_points=[
-                CommandHandler("gpt", gpt.start_gpt),
-                CallbackQueryHandler(gpt.start_gpt, pattern="^gpt_run$")
-            ],
-            states={
-                gpt.GPT_MODE: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, gpt.handle_gpt_message),
-                    CallbackQueryHandler(gpt.return_to_menu, pattern="^gpt_to_menu$")
-                ],
-            },
-            fallbacks=[CommandHandler("cancel", gpt.cancel)],
-        )
-        application.add_handler(conv_gpt)
+    # Обработка кнопок (в том числе gpt_run и random_finish)
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern="^(random_fact|gpt_run)$"))
+    application.add_handler(CallbackQueryHandler(random_fact_callback, pattern="^(random_more|random_finish)$"))
 
-        logger.info("Бот запущен успешно!")
-        application.run_polling()
+    # ChatGPT ConversationHandler
+    gpt_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("gpt", start_gpt),
+            CallbackQueryHandler(start_gpt, pattern="^gpt_run$")
+        ],
+        states={
+            GPT_MODE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_gpt_message),
+                CallbackQueryHandler(return_to_menu, pattern="^gpt_to_menu$")
+            ]
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+    application.add_handler(gpt_handler)
 
-    except Exception as e:
-        logger.error('Ошибка при запуске бота', exc_info=e)
-
+    # Запуск бота
+    logger.info("Бот запущен успешно!")
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
