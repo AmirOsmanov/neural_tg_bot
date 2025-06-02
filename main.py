@@ -41,7 +41,7 @@ def main():
             states={
                 gpt.GPT_MODE: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, gpt.handle_gpt_message),
-                    CallbackQueryHandler(gpt.return_to_menu, pattern="^gpt_to_menu$")
+                    CallbackQueryHandler(gpt.return_to_menu, pattern="^gpt_to_menu$")  # ✅
                 ],
             },
             fallbacks=[CommandHandler("cancel", gpt.cancel)],
