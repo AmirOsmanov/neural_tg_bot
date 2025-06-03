@@ -1,7 +1,10 @@
+"""Модуль для построения inline-клавиатур и других UI-элементов."""
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+
 def get_main_menu_keyboard():
-    """Возвращает клавиатуру главного меню"""
+    """Возвращает клавиатуру главного меню."""
     keyboard = [
         [InlineKeyboardButton("🎲 Рандомный факт", callback_data="random_fact")],
         [InlineKeyboardButton("🤖 ChatGPT", callback_data="gpt_run")],
