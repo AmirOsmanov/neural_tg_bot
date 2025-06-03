@@ -38,18 +38,15 @@ def main():
     gpt_handler = ConversationHandler(
         entry_points=[
             CommandHandler("gpt", start_gpt),
-            CallbackQueryHandler(start_gpt, pattern="^gpt_run$"),
+            CallbackQueryHandler(start_gpt, pattern="^gpt_run$")
         ],
         states={
             GPT_MODE: [
-                # любые текстовые сообщения (кроме команд) — пойдёт в handle_gpt_message
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_gpt_message),
-                # нажатие кнопки «Главное меню» (callback_data="gpt_to_menu")
-                CallbackQueryHandler(return_to_menu, pattern="^gpt_to_menu$"),
+                CallbackQueryHandler(return_to_menu, pattern="^gpt_to_menu$")
             ]
         },
         fallbacks=[CommandHandler("cancel", cancel)],
-        per_message=False,  # оставляем по умолчанию
     )
     application.add_handler(gpt_handler)
 
