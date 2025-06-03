@@ -10,9 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка команды /start."""
+    """Обработка команды /start — показать главное меню."""
     reply_markup = get_main_menu_keyboard()
-
     welcome_text = (
         "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"
         "🚀 <b>Доступные функции:</b>\n"
@@ -23,10 +22,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Подготовка меню — генерация недельной подборки (в разработке)\n\n"
         "Выберите функцию из меню ниже:"
     )
-
-    await update.message.reply_text(
-        welcome_text, parse_mode="HTML", reply_markup=reply_markup
-    )
+    await update.message.reply_text(welcome_text, parse_mode="HTML", reply_markup=reply_markup)
 
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -34,15 +30,15 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # 1) Кнопка "🎲 Рандомный факт" здесь НЕ обрабатывается — она уходит сразу в random_fact_callback
+    # 1) Если нажали «Рандомный факт» — уходим в random_fact_callback, а здесь просто return
     if query.data == "random_fact":
         return
 
-    # 2) Кнопка "🤖 ChatGPT" здесь НЕ обрабатывается — она уходит в ConversationHandler
+    # 2) Если нажали «ChatGPT» — ConversationHandler сам перехватит этот callback (мы не обрабатываем здесь)
     if query.data == "gpt_run":
         return
 
-    # 3) «В разработке»
+    # 3) Если ‟в разработке” (talk, quiz, cook) — показываем заглушку и возвращаем меню спустя 2 сек
     if query.data in ["talk_coming_soon", "quiz_coming_soon", "cook_coming_soon"]:
         await query.edit_message_text(
             "🚧 <b>Функция в разработке!</b>\n\n"
@@ -55,7 +51,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def start_menu_again(query):
-    """Вернуть главное меню (заменить текущее сообщение на меню)."""
+    """Возвращает главное меню (заменяем текущее сообщение)."""
     reply_markup = get_main_menu_keyboard()
     await query.edit_message_text(
         "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"

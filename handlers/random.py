@@ -1,4 +1,4 @@
-"""Файл с хендлерами для «Рандомных фактов»."""
+"""Файл с хендлерами для «Рандомного факта»."""
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -23,12 +23,12 @@ async def random_fact_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     user = query.from_user
     logger.info(f"{user.first_name} ({user.id}) нажал кнопку: {query.data}")
 
-    if query.data in ["random_more", "random_fact"]:
-        # И «первый запуск» (callback_data="random_fact"), и «ещё факт» (random_more)
+    # 1) И «random_fact» (первый запуск), и «random_more» — просто пересылаем факт
+    if query.data in ["random_fact", "random_more"]:
         await send_fact(query, user)
 
+    # 2) Если нажали «random_finish» — вернуться в главное меню
     elif query.data == "random_finish":
-        # Вернуться в главное меню
         reply_markup = get_main_menu_keyboard()
         await query.edit_message_text(
             "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"
@@ -39,25 +39,26 @@ async def random_fact_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def send_fact(query_or_message, user):
-    """Служебная функция: генерируем факт и отправляем его."""
+    """Общая служебная функция: запрос к OpenAI + отправка."""
     try:
-        # 1) Если это CallbackQuery (edit_message_text), то редактируем текущее сообщение
+        # 1) Если query_or_message — CallbackQuery (у него есть метод edit_message_text)
         if hasattr(query_or_message, "edit_message_text"):
             await query_or_message.edit_message_text("🎲 Генерирую интересный факт... ⏳")
         else:
-            # 2) Иначе (Message), просто отправляем новое
+            # 2) Иначе, это текстовое сообщение (CommandHandler "/random")
             await query_or_message.reply_text("🎲 Генерирую интересный факт... ⏳")
 
-        # 3) Получаем факт через OpenAI
+        # 3) Получаем факт от OpenAI
         fact = await get_random_fact()
 
+        # 4) Клавиатура «еще факт» / «закончить»
         keyboard = [
             [InlineKeyboardButton("🎲 Хочу ещё факт", callback_data="random_more")],
             [InlineKeyboardButton("🏠 Закончить", callback_data="random_finish")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # 4) Редактируем (или отправляем) текст с фактом и кнопками
+        # 5) Редактируем (или отправляем) текст с фактом
         await query_or_message.edit_message_text(
             f"🧠 <b>Интересный факт:</b>\n\n{fact}",
             parse_mode="HTML",
@@ -67,7 +68,6 @@ async def send_fact(query_or_message, user):
 
     except Exception as e:
         logger.error(f"Ошибка при получении факта: {e}")
-        # В случае ошибки, показываем сообщение об этом и предлагаем вернуться в меню
         await query_or_message.edit_message_text(
             "😔 Произошла ошибка. Попробуйте позже.\n"
             "Используйте /start, чтобы вернуться в меню."
