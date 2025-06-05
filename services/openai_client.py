@@ -1,5 +1,3 @@
-# services/openai_client.py
-
 import logging
 from openai import AsyncOpenAI
 from config import CHATGPT_TOKEN
@@ -9,9 +7,6 @@ client = AsyncOpenAI(api_key=CHATGPT_TOKEN)
 
 
 async def get_random_fact() -> str:
-    """
-    Получить случайный факт от ChatGPT.
-    """
     try:
         response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -47,10 +42,6 @@ async def get_random_fact() -> str:
 
 
 async def ask_chatgpt(messages) -> str:
-    """
-    Отправка произвольного списка сообщений (system + user) в ChatGPT и получение ответа.
-    messages: List[{"role":..., "content":...}]
-    """
     try:
         response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -65,3 +56,21 @@ async def ask_chatgpt(messages) -> str:
     except Exception as e:
         logger.error(f"Ошибка при общении с ChatGPT: {e}")
         return "😔 К сожалению, не удалось получить ответ от ChatGPT."
+
+async def get_quiz_question(theme: str) -> tuple[str, str]:
+    system = ("Ты помощник-викторина. Сформулируй ОДИН вопрос по теме «"
+              f"{theme}» и дай правильный ответ в JSON:"
+              r' {"question": "...", "answer": "..."} '
+              "не добавляй ничего лишнего.")
+    response = await client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        temperature=0.7,
+        max_tokens=200,
+        messages=[{"role": "system", "content": system}]
+    )
+    import json
+    data = json.loads(response.choices[0].message.content)
+    return data["question"], data["answer"]
+
+async def check_quiz_answer(user_answer: str, correct_answer: str) -> bool:
+    return correct_answer.lower() in user_answer.lower()
