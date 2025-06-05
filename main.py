@@ -22,6 +22,7 @@ from handlers.talk import (
     TALK_PERSONA,
     TALK_MODE
 )
+from handlers.quiz import build_quiz_handler
 from config import TG_BOT_TOKEN
 
 # ─── Настройка логирования ─────────────────────────────────────────────────────────────────────────────────────
@@ -76,6 +77,8 @@ def main():
         per_message=False
     )
     application.add_handler(gpt_handler)
+
+    application.add_handler(build_quiz_handler())
 
     # ─── ConversationHandler для /talk ──────────────────────────────────────────────────────────────────────
     talk_handler = ConversationHandler(

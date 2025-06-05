@@ -5,6 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import asyncio
 from services.ui import get_main_menu_keyboard
+from handlers.quiz import start_quiz_command
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,11 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "random_fact":
         # Этот случай переходит в random.py
         return
+
+    if query.data == "quiz_run":
+        # удаляем меню и запускаем квиз
+        await query.message.delete()
+        return await start_quiz_command(query, context)
 
     if query.data in ["talk_coming_soon", "quiz_coming_soon", "cook_coming_soon"]:
         await query.edit_message_text(

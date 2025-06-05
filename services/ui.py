@@ -15,7 +15,7 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎲 Рандомный факт", callback_data="random_fact")],
         [InlineKeyboardButton("🤖 ChatGPT", callback_data="gpt_run")],
         [InlineKeyboardButton("👥 Диалог с личностью", callback_data="talk_run")],
-        [InlineKeyboardButton("🧠 Квиз (скоро)", callback_data="quiz_coming_soon")],
+        [InlineKeyboardButton("🧠 Квиз", callback_data="quiz_run")],
         [InlineKeyboardButton("👨‍🍳 Подготовка меню (скоро)", callback_data="cook_coming_soon")],
     ]
     return InlineKeyboardMarkup(keyboard)
