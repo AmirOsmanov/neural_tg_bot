@@ -1,5 +1,3 @@
-# main.py
-
 import logging
 import os
 from telegram.ext import (
@@ -25,7 +23,7 @@ from handlers.talk import (
 from handlers.quiz import build_quiz_handler
 from config import TG_BOT_TOKEN
 
-# ─── Настройка логирования ─────────────────────────────────────────────────────────────────────────────────────
+# Настройка логирования
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -41,10 +39,10 @@ logger = logging.getLogger(__name__)
 def main():
     application = Application.builder().token(TG_BOT_TOKEN).build()
 
-    # ─── Команда /start ─────────────────────────────────────────────────────────────────────────────────────
+    # Команда /start
     application.add_handler(CommandHandler("start", start))
 
-    # ─── Команда /random и кнопки «random_more», «random_finish» ─────────────────────────────────────────────
+    # Команда /random и кнопки «random_more», «random_finish»
     application.add_handler(CommandHandler("random", random_fact))
     application.add_handler(
         CallbackQueryHandler(
@@ -53,7 +51,7 @@ def main():
         )
     )
 
-    # ─── Обработка кнопок главного меню (кроме gpt_run) ───────────────────────────────────────────────────
+    # Обработка кнопок главного меню (кроме gpt_run)
     application.add_handler(
         CallbackQueryHandler(
             menu_callback,
@@ -61,7 +59,7 @@ def main():
         )
     )
 
-    # ─── ConversationHandler для ChatGPT ────────────────────────────────────────────────────────────────────
+    # ConversationHandler для ChatGPT
     gpt_handler = ConversationHandler(
         entry_points=[
             CommandHandler("gpt", start_gpt),
@@ -80,7 +78,7 @@ def main():
 
     application.add_handler(build_quiz_handler())
 
-    # ─── ConversationHandler для /talk ──────────────────────────────────────────────────────────────────────
+    # ConversationHandler для /talk
     talk_handler = ConversationHandler(
         entry_points=[
             CommandHandler("talk", start_talk),
@@ -102,7 +100,7 @@ def main():
     )
     application.add_handler(talk_handler)
 
-    # ─── Запуск бота ────────────────────────────────────────────────────────────────────────────────────────
+    # Запуск бота
     logger.info("Бот запущен успешно!")
     application.run_polling()
 

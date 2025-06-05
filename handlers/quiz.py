@@ -1,4 +1,3 @@
-# handlers/quiz.py
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -7,7 +6,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     MessageHandler,
     CommandHandler,
-    filters,                       # ← оставляем
+    filters,
 )
 
 from services.ui import get_main_menu_keyboard
@@ -15,13 +14,10 @@ from services.openai_client import get_quiz_question, check_quiz_answer
 
 logger = logging.getLogger(__name__)
 
-# ---------- состояния ----------
-CHOOSE_THEME, WAIT_ANSWER = range(2)   # 2 состояния нам достаточно
+CHOOSE_THEME, WAIT_ANSWER = range(2)
 
-# ---------- темы ----------
 QUIZ_THEMES = ["История", "Наука", "Кино"]
 
-# ---------- клавиатуры ----------
 def themes_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(t, callback_data=f"theme_{t}")] for t in QUIZ_THEMES] +
@@ -37,12 +33,10 @@ def quiz_nav_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🏠 Главное меню", callback_data="quiz_exit")]
     ])
 
-# ---------- /quiz ----------
 async def start_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     logger.info("%s запустил /quiz", user.first_name)
 
-    # удаляем исходное сообщение, если оно есть
     if update.message:
         await update.message.delete()
 
@@ -55,18 +49,15 @@ async def start_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply_markup=themes_keyboard()
     )
 
-    # обнуляем счётчик
     context.user_data["quiz_score"] = 0
     return CHOOSE_THEME
 
-# ---------- выбор темы и навигация ----------
 async def choose_theme(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     data = query.data
 
-    # выход в меню
     if data == "quiz_exit":
         await query.message.delete()
         await context.bot.send_message(
@@ -76,22 +67,18 @@ async def choose_theme(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
-    # смена темы
     if data == "quiz_change":
         await query.message.edit_text("🧠 Выбери новую тему:", reply_markup=themes_keyboard())
         return CHOOSE_THEME
 
-    # следующий вопрос на той же теме
     if data == "quiz_next":
         return await ask_question(query, context)
 
-    # выбран новый theme_X
     if data.startswith("theme_"):
         context.user_data["quiz_theme"] = data.replace("theme_", "")
         await query.message.delete()
         return await ask_question(query, context)
 
-# ---------- задаём вопрос ----------
 async def ask_question(query, context):
     theme = context.user_data["quiz_theme"]
     question_text, correct = await get_quiz_question(theme)
@@ -104,7 +91,6 @@ async def ask_question(query, context):
     )
     return WAIT_ANSWER
 
-# ---------- проверяем ответ ----------
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_answer = update.message.text
     correct_answer = context.user_data.get("correct_answer", "")
@@ -122,7 +108,6 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return CHOOSE_THEME
 
-# ---------- fallbacks ----------
 async def cancel_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Квиз прерван.",
@@ -130,7 +115,6 @@ async def cancel_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
-# ---------- сборка обработчика ----------
 def build_quiz_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[

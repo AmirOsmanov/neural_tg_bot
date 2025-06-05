@@ -1,5 +1,3 @@
-# handlers/basic.py
-
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -11,9 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обработка команды /start: показываем главное меню.
-    """
     reply_markup = get_main_menu_keyboard()
     welcome_text = (
         "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"
@@ -21,7 +16,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Рандомный факт — получи интересный факт\n"
         "• ChatGPT — общение с ИИ\n"
         "• Диалог с личностью — говори с известными людьми\n"
-        "• Квиз — проверь свои знания (в разработке)\n"
+        "• Квиз — проверь свои знания\n"
         "• Подготовка меню — генерация недельной подборки (в разработке)\n\n"
         "Выберите функцию из меню ниже:"
     )
@@ -33,10 +28,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обработка нажатий кнопок главного меню (кроме gpt_run и random_fact).
-    Обрабатываем «В разработке» и «random_fact» здесь.
-    """
     query = update.callback_query
     await query.answer()
 
@@ -49,11 +40,11 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.delete()
         return await start_quiz_command(query, context)
 
-    if query.data in ["talk_coming_soon", "quiz_coming_soon", "cook_coming_soon"]:
+    if query.data in ["cook_coming_soon"]:
         await query.edit_message_text(
             "🚧 <b>Функция в разработке!</b>\n\n"
             "Эта функция будет добавлена позднее.\n"
-            "Пока что попробуйте «Рандомный факт»!",
+            "Пока что попробуйте другие функции!",
             parse_mode='HTML'
         )
         await asyncio.sleep(2)
@@ -61,9 +52,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def start_menu_again(query):
-    """
-    Возврат в главное меню (после «Функция в разработке»).
-    """
     reply_markup = get_main_menu_keyboard()
     await query.edit_message_text(
         "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"
