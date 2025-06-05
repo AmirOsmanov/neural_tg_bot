@@ -1,5 +1,6 @@
+# handlers/gpt.py
+
 import logging
-import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from services.openai_client import ask_chatgpt
@@ -7,73 +8,87 @@ from services.ui import get_main_menu_keyboard
 
 logger = logging.getLogger(__name__)
 
-# Единственное состояние «ChatGPT-режима» — просто число 0
-GPT_MODE = 0
+# ─── Заменили range(1) на одиночное целое ───────────────────────────────────────────────────────────────────
+GPT_MODE = 1
 
-
-async def start_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_gpt(update_or_query, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Запуск диалога с ChatGPT: сначала показываем изображение, потом приглашаем
-    пользователя задать вопрос.
+    Запускает диалог с ChatGPT.
+    Если вызвано через /gpt (Message), отправляет фото + текст.
+    Если вызвано через кнопку (CallbackQuery), удаляет старое сообщение,
+    отправляет фото + текст.
     """
-    img_path = os.path.join("images", "chatgpt.jpg")
 
-    # Если пришёл CallbackQuery (нажатие на кнопку «ChatGPT»)
-    if update.callback_query:
-        query = update.callback_query
-        await query.answer()
-        await query.message.delete()
+    # Сценарий 1: вызов через команду /gpt
+    if hasattr(update_or_query, "message") and update_or_query.message:
+        message = update_or_query.message
+        user = update_or_query.effective_user
+        chat_id = message.chat_id
 
-        # 1) Отправляем картинку
-        with open(img_path, "rb") as photo:
-            await context.bot.send_photo(chat_id=query.from_user.id, photo=photo)
+        # Отправляем изображение
+        try:
+            await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=open("images/chatgpt.jpg", "rb")
+            )
+        except Exception as e:
+            logger.error(f"Не удалось отправить chatgpt.jpg: {e}")
 
-        # 2) Отправляем приглашение к вводу
+        # Просим пользователя ввести вопрос
         await context.bot.send_message(
-            chat_id=query.from_user.id,
-            text="🧠 ChatGPT активен.\n\nНапиши свой вопрос или сообщение:",
-            parse_mode="HTML"
-        )
-
-        user = query.from_user
-
-    # Если пришёл обычный /gpt (Update.message)
-    elif update.message:
-        message = update.message
-        user = update.effective_user
-
-        # 1) Отправляем картинку
-        with open(img_path, "rb") as photo:
-            await message.reply_photo(photo=photo)
-
-        # 2) Приглашение к вводу
-        await message.reply_text(
-            "🧠 ChatGPT активен.\n\nНапиши свой вопрос или сообщение:",
+            chat_id=chat_id,
+            text="🧠 ChatGPT активен.\n\nНапишите ваш вопрос:",
             parse_mode="HTML"
         )
 
     else:
-        # На всякий случай, если вдруг ни callback_query, ни message нет
-        return ConversationHandler.END
+        # Сценарий 2: вызов через кнопку «ChatGPT» (CallbackQuery)
+        query = update_or_query.callback_query
+        await query.answer()
+        user = query.from_user
+        chat_id = query.from_user.id
+
+        # Удаляем старое меню
+        await query.message.delete()
+
+        # Отправляем изображение
+        try:
+            await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=open("images/chatgpt.jpg", "rb")
+            )
+        except Exception as e:
+            logger.error(f"Не удалось отправить chatgpt.jpg: {e}")
+
+        # Просим пользователя ввести вопрос
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="🧠 ChatGPT активен.\n\nНапишите ваш вопрос:",
+            parse_mode="HTML"
+        )
 
     logger.info(f"{user.first_name} ({user.id}) начал общение с ChatGPT")
-    return GPT_MODE  # возвращаем 0, и это совпадает с ключом в states
+    # Возвращаем целочисленное состояние
+    return GPT_MODE
 
 
-async def handle_gpt_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_gpt_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Обработка сообщения пользователя в режиме ChatGPT: шлём ask_chatgpt и
-    возвращаем ответ с кнопкой «Главное меню».
+    Обрабатывает любое текстовое сообщение от пользователя в режиме ChatGPT:
+    отправляет его в OpenAI и возвращает ответ с кнопкой «Главное меню».
     """
     user = update.effective_user
-    user_input = update.message.text
-    logger.info(f"{user.first_name} ({user.id}) написал в ChatGPT: {user_input}")
+    user_input = update.message.text.strip()
+    logger.info(f"{user.first_name} ({user.id}) написал: {user_input}")
 
     try:
-        response = await ask_chatgpt(user_input)
+        response = await ask_chatgpt([
+            {"role": "system", "content": "Ты умный и вежливый помощник. Отвечай на русском языке."},
+            {"role": "user", "content": user_input}
+        ])
     except Exception as e:
         logger.error(f"Ошибка при обращении к ChatGPT: {e}")
-        response = "😔 Произошла ошибка. Попробуйте позже."
+        response = "😔 К сожалению, не удалось получить ответ от ChatGPT. Попробуйте позже."
 
     keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="gpt_to_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -82,24 +97,33 @@ async def handle_gpt_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
         response,
         reply_markup=reply_markup
     )
-    return GPT_MODE  # снова возвращаем 0
+
+    # Остаёмся в GPT_MODE, чтобы пользователь мог спросить ещё или нажать «Главное меню»
+    return GPT_MODE
 
 
-async def return_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка кнопки «🏠 Главное меню» внутри ChatGPT."""
+async def return_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Обработчик кнопки «Главное меню» (gpt_to_menu) в чате ChatGPT.
+    Редактирует сообщение и возвращает пользователя в главное меню.
+    """
     query = update.callback_query
     await query.answer()
     await query.message.edit_text(
-        "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\nВыберите одну из доступных функций:",
+        "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"
+        "Выберите одну из доступных функций:",
         parse_mode="HTML",
         reply_markup=get_main_menu_keyboard()
     )
     return ConversationHandler.END
 
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка команды /cancel во время ChatGPT-режима."""
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Обработчик команды /cancel в режиме ChatGPT.
+    Просто уведомляет пользователя и завершает разговор.
+    """
     user = update.effective_user
-    logger.info(f"{user.first_name} ({user.id}) вышел из ChatGPT")
+    logger.info(f"{user.first_name} ({user.id}) вышел из режима ChatGPT")
     await update.message.reply_text("❌ Вы вышли из режима ChatGPT.")
     return ConversationHandler.END
