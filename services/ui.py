@@ -7,6 +7,8 @@ CB_PERSONA_TALK  = "main_talk"          # 🗣️ Диалог с личност
 CB_QUIZ          = "main_quiz"          # ❓ Квиз
 CB_COOK          = "main_cook"          # 👨‍🍳 Подготовка меню
 
+CB_TRANSLATOR    = "main_translator"    # 🈂️ Переводчик
+
 CB_QUIZ_RUN      = "quiz_run"
 
 CB_P_EINSTEIN    = "persona_einstein"
@@ -20,11 +22,12 @@ CB_COOK_BACK     = "cook_back"          # «Выбрать другой лими
 
 def get_main_menu_keyboard() -> Mk:
     return Mk([
-        [Btn("🧠 Рандом-факт",        callback_data=CB_RANDOM_FACT)],
+        [Btn("🎲 Случайный факт",        callback_data=CB_RANDOM_FACT)],
         [Btn("🤖 ChatGPT",            callback_data=CB_GPT)],
+        [Btn("🈂️ Переводчик", callback_data=CB_TRANSLATOR)],
         [Btn("🗣️ Диалог с личностью", callback_data=CB_PERSONA_TALK)],
         [Btn("❓ Квиз",               callback_data=CB_QUIZ_RUN)],
-        [Btn("👨‍🍳 Подготовка меню",   callback_data=CB_COOK)],
+        [Btn("🍱 Меню на неделю",   callback_data=CB_COOK)],
     ])
 
 

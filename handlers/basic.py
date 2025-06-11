@@ -18,6 +18,7 @@ def _kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🎲 Случайный факт",     callback_data=ui.CB_RANDOM_FACT)],
         [InlineKeyboardButton("🤖 ChatGPT",            callback_data=ui.CB_GPT)],
+        [InlineKeyboardButton("🈂️ Переводчик",         callback_data=ui.CB_TRANSLATOR)],
         [InlineKeyboardButton("🗣️ Диалог с личностью", callback_data=ui.CB_PERSONA_TALK)],
         [InlineKeyboardButton("❓ Квиз",               callback_data=ui.CB_QUIZ_RUN)],
         [InlineKeyboardButton("🍱 Меню на неделю",     callback_data=ui.CB_COOK)],

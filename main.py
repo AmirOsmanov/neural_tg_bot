@@ -8,7 +8,7 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
 )
-from handlers import basic, random, gpt, talk, quiz, cook
+from handlers import basic, random, gpt, talk, quiz, cook, translator
 from services.ui import CB_MAIN_MENU
 
 # токен и логирование
@@ -40,6 +40,7 @@ def build_app() -> Application:
     random.register_handlers(app)
     cook.register_handlers(app)
     app.add_handler(gpt.build_gpt_handler())
+    app.add_handler(translator.build_translator_handler())
     app.add_handler(talk.build_talk_handler())
     app.add_handler(quiz.build_quiz_handler())
 
