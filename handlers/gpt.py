@@ -1,103 +1,91 @@
+from __future__ import annotations
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import (
+    ContextTypes,
+    ConversationHandler,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    filters,
+)
 from services.openai_client import ask_chatgpt
-from services.ui import get_main_menu_keyboard
+from services import ui
+from handlers import basic
 
 logger = logging.getLogger(__name__)
 
-GPT_MODE = 1
+# константы
+IMAGE = "images/chatgpt.jpg"
+ASK   = 0
+CB_STOP = "gpt_stop"
 
-async def start_gpt(update_or_query, context: ContextTypes.DEFAULT_TYPE) -> int:
+# клавиатура под ответами
+def _kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("🚪 Закончить",   callback_data=CB_STOP),
+        InlineKeyboardButton("🔙 Главное меню", callback_data=ui.CB_MAIN_MENU),
+    ]])
 
-    if hasattr(update_or_query, "message") and update_or_query.message:
-        message = update_or_query.message
-        user = update_or_query.effective_user
-        chat_id = message.chat_id
 
+async def _end_and_menu(update: Update,
+                        context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query:
+        await update.callback_query.answer()
         try:
-            await context.bot.send_photo(
-                chat_id=chat_id,
-                photo=open("images/chatgpt.jpg", "rb")
-            )
-        except Exception as e:
-            logger.error(f"Не удалось отправить chatgpt.jpg: {e}")
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="🧠 ChatGPT активен.\n\nНапишите ваш вопрос:",
-            parse_mode="HTML"
-        )
-
-    else:
-        query = update_or_query.callback_query
-        await query.answer()
-        user = query.from_user
-        chat_id = query.from_user.id
-
-        await query.message.delete()
-
-        try:
-            await context.bot.send_photo(
-                chat_id=chat_id,
-                photo=open("images/chatgpt.jpg", "rb")
-            )
-        except Exception as e:
-            logger.error(f"Не удалось отправить chatgpt.jpg: {e}")
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="🧠 ChatGPT активен.\n\nНапишите ваш вопрос:",
-            parse_mode="HTML"
-        )
-
-    logger.info(f"{user.first_name} ({user.id}) начал общение с ChatGPT")
-    return GPT_MODE
+            await update.callback_query.message.delete()
+        except Exception:
+            pass
+    await basic.show_main_menu(update, context)
+    return ConversationHandler.END
 
 
-async def handle_gpt_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.effective_user
-    user_input = update.message.text.strip()
-    logger.info(f"{user.first_name} ({user.id}) написал: {user_input}")
+async def start(update: Update,
+                context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Точка входа (команда /gpt или кнопка из главного меню)."""
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.delete()
 
+    await update.effective_message.reply_photo(
+        IMAGE,
+        caption="Спросите меня о чём-нибудь!",
+        reply_markup=_kb(),
+    )
+    return ASK
+
+
+async def reply(update: Update,
+                context: ContextTypes.DEFAULT_TYPE) -> int:
+    question = update.message.text
     try:
-        response = await ask_chatgpt([
-            {"role": "system", "content": "Ты умный и вежливый помощник. Отвечай на русском языке."},
-            {"role": "user", "content": user_input}
-        ])
-    except Exception as e:
-        logger.error(f"Ошибка при обращении к ChatGPT: {e}")
-        response = "😔 К сожалению, не удалось получить ответ от ChatGPT. Попробуйте позже."
+        answer = await ask_chatgpt(question)
+    except Exception as exc:                  # noqa: BLE001
+        logger.exception("GPT error: %s", exc)
+        answer = "⚠️ Не удалось получить ответ. Попробуйте ещё раз."
 
-    keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="gpt_to_menu")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(answer, reply_markup=_kb())
+    return ASK
 
-    await update.message.reply_text(
-        response,
-        reply_markup=reply_markup
+
+def build_gpt_handler() -> ConversationHandler:
+    return ConversationHandler(
+        entry_points=[
+            CommandHandler("gpt", start),
+            CallbackQueryHandler(start, pattern=f"^{ui.CB_GPT}$"),
+        ],
+        states={
+            ASK: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, reply),
+                CallbackQueryHandler(_end_and_menu, pattern=f"^{CB_STOP}$"),
+                CallbackQueryHandler(_end_and_menu,
+                                    pattern=f"^{ui.CB_MAIN_MENU}$"),
+            ]
+        },
+        fallbacks=[CallbackQueryHandler(
+            _end_and_menu,
+            pattern=f"^({CB_STOP}|{ui.CB_MAIN_MENU})$",
+        )],
+        per_chat=True,
+        per_user=False,
     )
-
-    return GPT_MODE
-
-
-async def return_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-    await query.message.edit_text(
-        "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"
-        "Выберите одну из доступных функций:",
-        parse_mode="HTML",
-        reply_markup=get_main_menu_keyboard()
-    )
-    return ConversationHandler.END
-
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    Обработчик команды /cancel в режиме ChatGPT.
-    Просто уведомляет пользователя и завершает разговор.
-    """
-    user = update.effective_user
-    logger.info(f"{user.first_name} ({user.id}) вышел из режима ChatGPT")
-    await update.message.reply_text("❌ Вы вышли из режима ChatGPT.")
-    return ConversationHandler.END

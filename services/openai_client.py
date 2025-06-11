@@ -1,76 +1,85 @@
-import logging
-from openai import AsyncOpenAI
-from config import CHATGPT_TOKEN
+from __future__ import annotations
+import os, json, logging
+from typing import Any, Dict, List, Tuple
+from dotenv import load_dotenv
+import openai
+
+# токен
+load_dotenv()
+_API_KEY = os.getenv("CHATGPT_TOKEN", "")
+if not _API_KEY:
+    raise RuntimeError("CHATGPT_TOKEN не найден в .env")
+
+client = openai.AsyncOpenAI(api_key=_API_KEY)
+_MODEL = "gpt-3.5-turbo"
 
 logger = logging.getLogger(__name__)
-client = AsyncOpenAI(api_key=CHATGPT_TOKEN)
 
 
-async def get_random_fact() -> str:
+# функция обращения к chatgpt
+async def ask_chatgpt(
+    user_text: str,
+    *,
+    system_prompt: str | None = None,
+    temperature: float = 0.8,
+    model: str = _MODEL,
+) -> str:
+    messages: List[Dict[str, Any]] = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": user_text})
+
     try:
-        response = await client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Ты помощник, который рассказывает "
-                        "интересные и познавательные факты. "
-                        "Отвечай на русском языке."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "Расскажи интересный случайный факт из "
-                        "любой области знаний. Факт должен быть "
-                        "познавательным, удивительным и не слишком "
-                        "длинным (максимум 3–4 предложения)."
-                    )
-                }
-            ],
-            max_tokens=200,
-            temperature=0.8
-        )
-        fact = response.choices[0].message.content.strip()
-        logger.info("Факт успешно получен от OpenAI")
-        return fact
-
-    except Exception as e:
-        logger.error(f"Ошибка при получении факта от OpenAI: {e}")
-        return "🤔 К сожалению, не удалось получить факт в данный момент."
-
-
-async def ask_chatgpt(messages) -> str:
-    try:
-        response = await client.chat.completions.create(
-            model="gpt-3.5-turbo",
+        resp = await client.chat.completions.create(
+            model=model,
+            temperature=temperature,
             messages=messages,
-            max_tokens=400,
-            temperature=0.7
         )
-        reply = response.choices[0].message.content.strip()
-        logger.info("Ответ успешно получен от OpenAI")
-        return reply
+        return resp.choices[0].message.content.strip()
+    except Exception as exc:                         # noqa: BLE001
+        logger.exception("OpenAI request failed: %s", exc)
+        raise RuntimeError("Не удалось получить ответ от ChatGPT") from exc
 
-    except Exception as e:
-        logger.error(f"Ошибка при общении с ChatGPT: {e}")
-        return "😔 К сожалению, не удалось получить ответ от ChatGPT."
-
-async def get_quiz_question(theme: str) -> tuple[str, str]:
-    system = ("Ты помощник-викторина. Сформулируй ОДИН вопрос по теме «"
-              f"{theme}» и дай правильный ответ в JSON:"
-              r' {"question": "...", "answer": "..."} '
-              "не добавляй ничего лишнего.")
-    response = await client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        temperature=0.7,
-        max_tokens=200,
-        messages=[{"role": "system", "content": system}]
+# Random fact
+async def get_random_fact() -> str:
+    return await ask_chatgpt(
+        "Приведи один интересный научный факт одной строкой, "
+        "начав с подходящего emoji.",
+        temperature=0.95,
     )
-    import json
-    data = json.loads(response.choices[0].message.content)
-    return data["question"], data["answer"]
 
-async def check_quiz_answer(user_answer: str, correct_answer: str) -> bool:
-    return correct_answer.lower() in user_answer.lower()
+
+# Подготовка меню на неделю
+async def get_week_menu(kcal: int) -> str:
+    prompt = (
+        f"Составь ПОЛНОЕ меню на 7 дней (обозначения дней: Пн, Вт, Ср, Чт, Пт, Сб, Вс) "
+        f"около {kcal} ккал/день.\n"
+        "На каждый день пять приёмов пищи: Завтрак, Перекус, Обед, Полдник, Ужин.\n"
+        "Формат вывода строго такой:\n"
+        "*Меню* (~ XXXX ккал/день)\n\n"
+        "Пн\n• Завтрак: блюдо – 250 г ≈ XXX ккал\n"
+        "… (и т.д. для Перекуса, Обеда, Полдника, Ужина)\n\n"
+        "Вт\n• …\n…\n\n"
+        "(и так далее до Вс)\n\n"
+        "*Список покупок*\n— продукт: количество (шт/кг)\n\n"
+        "Без пояснений и лишних символов. Включи все 7 дней."
+    )
+    return await ask_chatgpt(prompt, temperature=0.65)
+
+
+# Квиз
+async def get_quiz_question(topic_ru: str) -> Tuple[str, List[str], int]:
+    prompt = (
+        "Сгенерируй ОДИН вопрос викторины по теме "
+        f"«{topic_ru}».\n"
+        "Верни строго JSON:\n"
+        '{ "q": "вопрос", "options": ["A","B","C"], "answer": N }\n'
+        "где N — индекс правильного варианта (0-2). Без комментариев."
+    )
+    raw = await ask_chatgpt(prompt, temperature=0.85)
+    try:
+        data = json.loads(raw)
+        return data["q"], data["options"], int(data["answer"])
+    except Exception as exc:                          # noqa: BLE001
+        logger.warning("Bad quiz JSON: %s / %s", raw, exc)
+        return "Ошибка генерации вопроса.", ["1", "2", "3"], 0
