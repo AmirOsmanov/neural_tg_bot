@@ -1,129 +1,127 @@
+from __future__ import annotations
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ContextTypes,
-    ConversationHandler,
-    CallbackQueryHandler,
-    MessageHandler,
-    CommandHandler,
-    filters,
+from telegram import (
+    Update, InlineKeyboardMarkup as Mk, InlineKeyboardButton as Btn,
 )
-
-from services.ui import get_main_menu_keyboard
-from services.openai_client import get_quiz_question, check_quiz_answer
+from telegram.ext import (
+    ContextTypes, ConversationHandler,
+    CommandHandler, CallbackQueryHandler,
+)
+from services.ui import CB_QUIZ_RUN
+from services.openai_client import get_quiz_question
 
 logger = logging.getLogger(__name__)
+IMAGE = "images/quiz.jpg"
 
-CHOOSE_THEME, WAIT_ANSWER = range(2)
+TOPIC, ASK = range(2)
 
-QUIZ_THEMES = ["История", "Наука", "Кино"]
+TOPICS = {
+    "hist": "История",
+    "sci":  "Наука",
+    "mov":  "Кино",
+}
 
-def themes_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(t, callback_data=f"theme_{t}")] for t in QUIZ_THEMES] +
-        [[InlineKeyboardButton("🏠 Главное меню", callback_data="quiz_exit")]]
-    )
-
-def quiz_nav_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("❓ Следующий вопрос", callback_data="quiz_next"),
-            InlineKeyboardButton("🔄 Сменить тему", callback_data="quiz_change")
-        ],
-        [InlineKeyboardButton("🏠 Главное меню", callback_data="quiz_exit")]
+def _topics_kb() -> Mk:
+    return Mk([
+        [Btn(name, callback_data=f"quiz_topic:{code}")]
+        for code, name in TOPICS.items()
     ])
 
-async def start_quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    logger.info("%s запустил /quiz", user.first_name)
 
-    if update.message:
-        await update.message.delete()
+def _ans_kb(topic: str, q_id: int, options: list[str]) -> Mk:
+    return Mk([
+        [Btn(txt, callback_data=f"quiz_ans:{q_id}:{i}")]
+        for i, txt in enumerate(options)
+    ])
 
-    with open("images/quiz.jpg", "rb") as img:
-        await context.bot.send_photo(chat_id=user.id, photo=img)
 
-    await context.bot.send_message(
-        chat_id=user.id,
-        text="🧠 Выбери тему квиза:",
-        reply_markup=themes_keyboard()
+def _after_kb(topic: str) -> Mk:
+    return Mk([
+        [Btn("➕ Ещё вопрос", callback_data=f"quiz_next:{topic}")],
+        [Btn("🔙 Главное меню", callback_data="quiz_finish")],
+    ])
+
+
+async def start_quiz_command(update: Update,
+                             context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.delete()
+    await update.effective_message.reply_photo(
+        IMAGE,
+        caption="📚 Выберите тему квиза:",
+        reply_markup=_topics_kb(),
     )
+    return TOPIC
 
-    context.user_data["quiz_score"] = 0
-    return CHOOSE_THEME
 
-async def choose_theme(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def choose_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    topic_code = q.data.split(":")[1]
+    context.user_data["topic"] = topic_code
+    return await _ask_question(q, context)
 
-    data = query.data
 
-    if data == "quiz_exit":
-        await query.message.delete()
-        await context.bot.send_message(
-            chat_id=query.from_user.id,
-            text="Вы вернулись в меню.",
-            reply_markup=get_main_menu_keyboard()
-        )
-        return ConversationHandler.END
+async def _ask_question(target, context) -> int:
+    topic_code = context.user_data["topic"]
+    topic_ru   = TOPICS[topic_code]
 
-    if data == "quiz_change":
-        await query.message.edit_text("🧠 Выбери новую тему:", reply_markup=themes_keyboard())
-        return CHOOSE_THEME
+    q_text, options, right = await get_quiz_question(topic_ru)
 
-    if data == "quiz_next":
-        return await ask_question(query, context)
+    context.user_data["right"] = right
 
-    if data.startswith("theme_"):
-        context.user_data["quiz_theme"] = data.replace("theme_", "")
-        await query.message.delete()
-        return await ask_question(query, context)
+    kb = _ans_kb(topic_code, id(q_text), options)
 
-async def ask_question(query, context):
-    theme = context.user_data["quiz_theme"]
-    question_text, correct = await get_quiz_question(theme)
-    context.user_data["correct_answer"] = correct
+    try:
+        await target.edit_message_caption(q_text, reply_markup=kb)
+    except Exception:                               # noqa: BLE001
+        await target.message.reply_photo(IMAGE, caption=q_text, reply_markup=kb)
 
-    await context.bot.send_message(
-        chat_id=query.from_user.id,
-        text=f"🧐 <b>Вопрос по теме «{theme}»:</b>\n{question_text}",
-        parse_mode="HTML"
-    )
-    return WAIT_ANSWER
+    return ASK
 
-async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_answer = update.message.text
-    correct_answer = context.user_data.get("correct_answer", "")
-    is_right = await check_quiz_answer(user_answer, correct_answer)
 
-    if is_right:
-        context.user_data["quiz_score"] += 1
+async def handle_answer(update: Update,
+                        context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
 
-    score = context.user_data["quiz_score"]
-    reply = "✅ Правильно!" if is_right else f"❌ Неправильно. Правильный ответ: {correct_answer}"
+    chosen = int(q.data.split(":")[-1])
+    right  = context.user_data.get("right", -1)
 
-    await update.message.reply_text(
-        f"{reply}\n\nТвой счёт: {score}",
-        reply_markup=quiz_nav_keyboard()
-    )
-    return CHOOSE_THEME
+    msg = "✅ Верно!" if chosen == right else "❌ Неверно!"
+    topic_code = context.user_data["topic"]
+    await q.message.reply_text(msg, reply_markup=_after_kb(topic_code))
+    return ASK
 
-async def cancel_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Квиз прерван.",
-        reply_markup=get_main_menu_keyboard()
-    )
+
+async def next_or_finish(update: Update,
+                         context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+
+    if q.data.startswith("quiz_next:"):
+        return await _ask_question(q, context)
+
+    from handlers.basic import show_main_menu
+    await show_main_menu(update, context)
     return ConversationHandler.END
+
 
 def build_quiz_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[
             CommandHandler("quiz", start_quiz_command),
-            CallbackQueryHandler(start_quiz_command, pattern="^quiz_run$"),
+            CallbackQueryHandler(start_quiz_command, pattern=f"^{CB_QUIZ_RUN}$"),
         ],
         states={
-            CHOOSE_THEME: [CallbackQueryHandler(choose_theme)],
-            WAIT_ANSWER:  [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_answer)],
+            TOPIC: [CallbackQueryHandler(choose_topic, pattern="^quiz_topic:")],
+            ASK: [
+                CallbackQueryHandler(handle_answer, pattern="^quiz_ans:"),
+                CallbackQueryHandler(next_or_finish,
+                                     pattern="^quiz_(next|finish)"),
+            ],
         },
-        fallbacks=[CommandHandler("cancel", cancel_quiz)],
+        fallbacks=[],
+        per_chat=True, per_user=False, per_message=False,
     )

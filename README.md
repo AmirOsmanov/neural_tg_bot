@@ -51,12 +51,19 @@ Telegram — у @BotFather (/newbot)
 │   ├─ gpt.py
 │   ├─ talk.py
 │   └─ quiz.py
+│   └─ cook.py
 │
 ├─ services/            # Обёртки OpenAI, UI-утилиты
 │   ├─ openai_client.py
 │   └─ ui.py
 │
 ├─ images/              # Картинки для отправки
+│   ├─ bot.jpg
+│   ├─ random.jpg
+│   ├─ chatgpt.jpg
+│   ├─ talk.jpg
+│   └─ quiz.jpg
+│   └─ cook.jpg
 │   ├─ random.jpg
 │   ├─ chatgpt.jpg
 │   └─ quiz.jpg

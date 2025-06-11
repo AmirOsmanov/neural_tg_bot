@@ -1,109 +1,56 @@
 import logging
-import os
+from pathlib import Path
+from os import getenv
+
+from dotenv import load_dotenv
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
-    ConversationHandler,
-    MessageHandler,
-    filters
 )
-from handlers.basic import start, menu_callback
-from handlers.random import random_fact, random_fact_callback
-from handlers.gpt import start_gpt, handle_gpt_message, cancel, return_to_menu, GPT_MODE
-from handlers.talk import (
-    start_talk,
-    choose_persona,
-    handle_talk_message,
-    return_to_menu_talk,
-    cancel_talk,
-    TALK_PERSONA,
-    TALK_MODE
-)
-from handlers.quiz import build_quiz_handler
-from config import TG_BOT_TOKEN
+from handlers import basic, random, gpt, talk, quiz, cook, translator
+from services.ui import CB_MAIN_MENU
 
-# Настройка логирования
-os.makedirs("logs", exist_ok=True)
+# токен и логирование
+load_dotenv()
+TOKEN = getenv("TG_BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError("TG_BOT_TOKEN отсутствует в .env")
+
+LOG_DIR = Path(__file__).resolve().parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
-        logging.FileHandler("logs/bot.log", encoding="utf-8"),
-        logging.StreamHandler()
-    ]
+        logging.StreamHandler(),
+        logging.FileHandler(LOG_DIR / "bot.log", encoding="utf-8"),
+    ],
 )
 logger = logging.getLogger(__name__)
 
 
-def main():
-    application = Application.builder().token(TG_BOT_TOKEN).build()
+# запуск бота
+def build_app() -> Application:
+    app = Application.builder().token(TOKEN).build()
 
-    # Команда /start
-    application.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("start", basic.show_main_menu))
 
-    # Команда /random и кнопки «random_more», «random_finish»
-    application.add_handler(CommandHandler("random", random_fact))
-    application.add_handler(
-        CallbackQueryHandler(
-            random_fact_callback,
-            pattern="^(random_fact|random_more|random_finish)$"
-        )
+    random.register_handlers(app)
+    cook.register_handlers(app)
+    app.add_handler(gpt.build_gpt_handler())
+    app.add_handler(translator.build_translator_handler())
+    app.add_handler(talk.build_talk_handler())
+    app.add_handler(quiz.build_quiz_handler())
+
+    app.add_handler(
+        CallbackQueryHandler(basic.show_main_menu, pattern=f"^{CB_MAIN_MENU}$")
     )
 
-    # Обработка кнопок главного меню (кроме gpt_run)
-    application.add_handler(
-        CallbackQueryHandler(
-            menu_callback,
-            pattern="^(random_fact|talk_coming_soon|quiz_coming_soon|cook_coming_soon)$"
-        )
-    )
-
-    # ConversationHandler для ChatGPT
-    gpt_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("gpt", start_gpt),
-            CallbackQueryHandler(start_gpt, pattern="^gpt_run$")
-        ],
-        states={
-            GPT_MODE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_gpt_message),
-                CallbackQueryHandler(return_to_menu, pattern="^gpt_to_menu$")
-            ]
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-        per_message=False
-    )
-    application.add_handler(gpt_handler)
-
-    application.add_handler(build_quiz_handler())
-
-    # ConversationHandler для /talk
-    talk_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("talk", start_talk),
-            CallbackQueryHandler(start_talk, pattern="^talk_run$")
-        ],
-        states={
-            # После того как пользователь нажал /talk, он выбирает личность
-            TALK_PERSONA: [
-                CallbackQueryHandler(choose_persona, pattern="^persona_")
-            ],
-            # После выбора личности пользователь пишет текстовые сообщения
-            TALK_MODE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_talk_message),
-                CallbackQueryHandler(return_to_menu_talk, pattern="^end_talk$")
-            ]
-        },
-        fallbacks=[CommandHandler("cancel", cancel_talk)],
-        per_message=False
-    )
-    application.add_handler(talk_handler)
-
-    # Запуск бота
-    logger.info("Бот запущен успешно!")
-    application.run_polling()
+    return app
 
 
 if __name__ == "__main__":
-    main()
+    logger.info("Бот запускается…")
+    build_app().run_polling(allowed_updates=["message", "callback_query"])

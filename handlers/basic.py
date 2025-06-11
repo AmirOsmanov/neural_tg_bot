@@ -1,61 +1,50 @@
+from __future__ import annotations
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-import asyncio
-from services.ui import get_main_menu_keyboard
-from handlers.quiz import start_quiz_command
+from telegram.ext import (
+    ContextTypes,
+    CommandHandler,
+    CallbackQueryHandler,
+)
+from services import ui
 
 logger = logging.getLogger(__name__)
 
+IMAGE = "images/bot.jpg"
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    reply_markup = get_main_menu_keyboard()
-    welcome_text = (
-        "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"
-        "🚀 <b>Доступные функции:</b>\n"
-        "• Рандомный факт — получи интересный факт\n"
-        "• ChatGPT — общение с ИИ\n"
-        "• Диалог с личностью — говори с известными людьми\n"
-        "• Квиз — проверь свои знания\n"
-        "• Подготовка меню — генерация недельной подборки (в разработке)\n\n"
-        "Выберите функцию из меню ниже:"
+
+# клавиатура
+def _kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎲 Случайный факт",     callback_data=ui.CB_RANDOM_FACT)],
+        [InlineKeyboardButton("🤖 ChatGPT",            callback_data=ui.CB_GPT)],
+        [InlineKeyboardButton("🈂️ Переводчик",         callback_data=ui.CB_TRANSLATOR)],
+        [InlineKeyboardButton("🗣️ Диалог с личностью", callback_data=ui.CB_PERSONA_TALK)],
+        [InlineKeyboardButton("❓ Квиз",               callback_data=ui.CB_QUIZ_RUN)],
+        [InlineKeyboardButton("🍱 Меню на неделю",     callback_data=ui.CB_COOK)],
+    ])
+
+
+# показать меню
+async def show_main_menu(update: Update,
+                         context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.callback_query:
+        await update.callback_query.answer()
+        try:
+            await update.callback_query.message.delete()
+        except Exception:
+            pass
+
+    await update.effective_message.reply_photo(
+        IMAGE,
+        caption="👋 Привет! Выберите режим работы:",
+        reply_markup=_kb(),
     )
-    await update.message.reply_text(
-        welcome_text,
-        parse_mode='HTML',
-        reply_markup=reply_markup
-    )
+    logger.info("Меню показано пользователю %s", update.effective_user.id)
 
 
-async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "random_fact":
-        # Этот случай переходит в random.py
-        return
-
-    if query.data == "quiz_run":
-        # удаляем меню и запускаем квиз
-        await query.message.delete()
-        return await start_quiz_command(query, context)
-
-    if query.data in ["cook_coming_soon"]:
-        await query.edit_message_text(
-            "🚧 <b>Функция в разработке!</b>\n\n"
-            "Эта функция будет добавлена позднее.\n"
-            "Пока что попробуйте другие функции!",
-            parse_mode='HTML'
-        )
-        await asyncio.sleep(2)
-        await start_menu_again(query)
-
-
-async def start_menu_again(query):
-    reply_markup = get_main_menu_keyboard()
-    await query.edit_message_text(
-        "🎉 <b>Добро пожаловать в ChatGPT бота!</b>\n\n"
-        "Выберите одну из доступных функций:",
-        parse_mode='HTML',
-        reply_markup=reply_markup
-    )
+def build_basic_handler() -> list:
+    return [
+        CommandHandler("start", show_main_menu),
+        CallbackQueryHandler(show_main_menu, pattern=f"^{ui.CB_MAIN_MENU}$"),
+    ]
