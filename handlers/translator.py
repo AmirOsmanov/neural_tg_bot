@@ -15,7 +15,6 @@ IMAGE = "images/translator.jpg"
 
 CHOOSE_LANG, TRANSLATE = range(2)
 
-# code  → (ru-name, prompt-name)
 LANG_MAP = {
     "lang_en": ("английский", "English"),
     "lang_es": ("испанский",  "Spanish"),

@@ -50,8 +50,9 @@ Telegram — у @BotFather (/newbot)
 │   ├─ random.py
 │   ├─ gpt.py
 │   ├─ talk.py
-│   └─ quiz.py
-│   └─ cook.py
+│   ├─ quiz.py
+│   ├─ cook.py
+│   └─ translator.py
 │
 ├─ services/            # Обёртки OpenAI, UI-утилиты
 │   ├─ openai_client.py
