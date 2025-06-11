@@ -3,7 +3,7 @@
 # Все основные зависимости бота c зафиксированными версиями,
 # протестированными в ветке develop (июнь 2025).
 
-python-telegram-bot==20.7     # Telegram Bot API wrapper (async / PTB v20)
+python-telegram-bot==22.1     # Telegram Bot API wrapper (async / PTB v20)
 openai==1.23.0                # Новое официальное OpenAI-SDK (AsyncOpenAI)
 httpx==0.27.0                 # Асинхронные HTTP-запросы (используется внутри PTB / openai)
 python-dotenv==1.0.1          # Подхватываем переменные из .env
