@@ -64,6 +64,9 @@ Telegram — у @BotFather (/newbot)
 │   ├─ talk.jpg
 │   └─ quiz.jpg
 │   └─ cook.jpg
+│   ├─ random.jpg
+│   ├─ chatgpt.jpg
+│   └─ quiz.jpg
 │
 ├─ .env.example         # Шаблон переменных окружения
 ├─ requirements.txt     # Все зависимости проекта
