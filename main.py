@@ -1,3 +1,21 @@
+"""
+main.py — точка входа Telegram-бота «neural_tg_bot».
+
+Функции:
+    build_app() -> telegram.ext.Application:
+        Создаёт и настраивает объект Application:
+        • читает токен из переменных окружения;
+        • настраивает логирование;
+        • регистрирует все модульные Conversation/Command-handlers;
+        • возвращает готовый к запуску экземпляр Application.
+
+Сценарии запуска:
+    • При импорте — код только объявляет функции/константы.
+    • При вызове как «python main.py» выполняется блок
+      `if __name__ == "__main__":`, который логирует старт и
+      запускает polling-цикл через Application.run_polling().
+"""
+
 import logging
 from pathlib import Path
 from os import getenv
@@ -11,7 +29,6 @@ from telegram.ext import (
 from handlers import basic, random, gpt, talk, quiz, cook, translator
 from services.ui import CB_MAIN_MENU
 
-# токен и логирование
 load_dotenv()
 TOKEN = getenv("TG_BOT_TOKEN")
 if not TOKEN:
@@ -31,8 +48,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# запуск бота
 def build_app() -> Application:
+    """Собирает и возвращает готовый объект `Application`.
+
+        Шаги:
+            1. Создаёт экземпляр `Application` с токеном из .env.
+            2. Регистрирует:
+               – /start-команду (`basic.show_main_menu`);
+               – модульные обработчики «random», «cook»;
+               – Conversation-обработчики GPT, Talk, Quiz, Translator;
+               – CallbackQuery-обработчик «Главное меню».
+            3. Отдаёт настроенный объект без запуска polling-цикла.
+    """
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", basic.show_main_menu))
